@@ -308,6 +308,11 @@
             </div>
         </div>
 
+        <!-- Infinite Scroll Loader -->
+        <div id="infinite-loader" class="hidden text-center py-8">
+            <div class="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+
         <!-- Loading, Error, and Empty States -->
         <div id="loading" class="hidden text-center py-16 px-6">
             <div class="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -337,19 +342,79 @@
 
     <script>
         let allArticles = [];
+        let fullArticleListForFiltering = []; // Holds all articles for client-side filtering
+        let currentPage = 1;
+        let isLoading = false;
+        let hasMore = true;
+        let currentSearchTerm = '';
+        const limit = 100;
+        let initialLoad = true;
 
-        async function loadArticles() {
+        // Debounce function to limit API calls on search input
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
+
+        async function loadArticles(isSearch = false) {
+            if (isLoading || (!hasMore && !isSearch)) return;
+
+            isLoading = true;
+
+            if (isSearch) {
+                currentPage = 1;
+                hasMore = true;
+                allArticles = [];
+                document.getElementById('articles-table').innerHTML = '';
+                document.getElementById('articles-cards').innerHTML = '';
+            }
+
+            if (currentPage === 1) {
+                showState('loading-initial');
+            } else {
+                showState('loading-more');
+            }
+
+            const searchTerm = document.getElementById('searchInput').value.trim();
+            let url = `https://dipco.itxpress.net/api/public/articles?page=${currentPage}&limit=${limit}`;
+            if (searchTerm) {
+                url += `&search=${encodeURIComponent(searchTerm)}`;
+            }
+
             try {
-                showState('loading');
-                const response = await fetch('https://dipco.itxpress.net/api/public/articles');
+                const response = await fetch(url);
                 if (!response.ok) throw new Error('Impossible de charger les données');
-                const articles = await response.json();
-                allArticles = articles;
-                populateFilters(articles);
-                filterAndSortArticles();
-                updateLastUpdateTime();
+
+                const newArticles = await response.json();
+
+                if (newArticles.length < limit) {
+                    hasMore = false;
+                }
+
+                allArticles = allArticles.concat(newArticles);
+                fullArticleListForFiltering = fullArticleListForFiltering.concat(newArticles);
+
+                if (initialLoad) {
+                    populateFilters(allArticles);
+                    initialLoad = false;
+                }
+
+                filterAndSortArticles(); // This will now filter/sort the currently loaded articles
+                currentPage++;
+
             } catch (error) {
                 showState('error', error.message);
+            } finally {
+                isLoading = false;
+                if (allArticles.length > 0) {
+                    showState('table');
+                } else if (!hasMore) {
+                    showState('empty');
+                }
             }
         }
 
@@ -376,19 +441,17 @@
         }
 
         function filterAndSortArticles() {
-            const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
             const selectedType = document.getElementById('typeFilter').value;
             const selectedDemar = document.getElementById('demarFilter').value;
             const sortOption = document.getElementById('sortOptions').value;
             const sortOptionMobile = document.getElementById('sortOptionsMobile').value;
             const currentSort = sortOption || sortOptionMobile;
 
+            // Client-side filtering on the already loaded articles
             let filteredArticles = allArticles.filter(article => {
-                const searchText = `${article.code || ''} ${article.description || ''} ${article.type || ''}`.toLowerCase();
-                const matchesSearch = searchText.includes(searchTerm);
                 const matchesType = !selectedType || article.type === selectedType;
                 const matchesDemar = !selectedDemar || article.demar === selectedDemar;
-                return matchesSearch && matchesType && matchesDemar;
+                return matchesType && matchesDemar;
             });
 
             switch (currentSort) {
@@ -411,24 +474,28 @@
                     filteredArticles.sort((a, b) => (b.description || '').localeCompare(a.description || ''));
                     break;
                 default:
+                    // Default sort by ID or code if not specified
                     break;
             }
 
             renderArticles(filteredArticles);
             renderCards(filteredArticles);
             updateStats(filteredArticles.length);
+             if (filteredArticles.length === 0 && !hasMore && !isLoading) {
+                showState('empty');
+            }
         }
 
         function renderArticles(articles) {
             const tableBody = document.getElementById('articles-table');
-            tableBody.innerHTML = '';
+            tableBody.innerHTML = ''; // Clear before render
 
-            if (articles.length === 0) {
+            if (articles.length === 0 && !hasMore && !isLoading) {
                 showState('empty');
                 return;
-            } else {
-                showState('table');
             }
+
+            showState('table'); // Or 'cards' depending on viewport
 
             articles.forEach(article => {
                 const row = document.createElement('tr');
@@ -450,14 +517,7 @@
 
         function renderCards(articles) {
             const cardsContainer = document.getElementById('articles-cards');
-            cardsContainer.innerHTML = '';
-
-            if (articles.length === 0) {
-                showState('empty');
-                return;
-            } else {
-                showState('cards');
-            }
+            cardsContainer.innerHTML = ''; // Clear before render
 
             articles.forEach(article => {
                 const card = document.createElement('div');
@@ -496,27 +556,47 @@
         }
 
         function showState(state, message = '') {
-            document.getElementById('loading').classList.add('hidden');
-            document.getElementById('error-message').classList.add('hidden');
-            document.getElementById('empty-state').classList.add('hidden');
-            document.querySelector('.desktop-table').classList.remove('hidden');
-            document.querySelector('.mobile-cards').classList.remove('hidden');
+            const loadingEl = document.getElementById('loading');
+            const infiniteLoaderEl = document.getElementById('infinite-loader');
+            const errorEl = document.getElementById('error-message');
+            const emptyEl = document.getElementById('empty-state');
+            const desktopTable = document.querySelector('.desktop-table');
+            const mobileCards = document.querySelector('.mobile-cards');
 
-            if (state === 'loading') {
-                document.getElementById('loading').classList.remove('hidden');
-                document.querySelector('.desktop-table').classList.add('hidden');
-                document.querySelector('.mobile-cards').classList.add('hidden');
-            } else if (state === 'error') {
-                document.getElementById('error-message').classList.remove('hidden');
-                document.getElementById('error-text').textContent = message;
-                document.querySelector('.desktop-table').classList.add('hidden');
-                document.querySelector('.mobile-cards').classList.add('hidden');
-            } else if (state === 'empty') {
-                document.getElementById('empty-state').classList.remove('hidden');
-                document.querySelector('.desktop-table').classList.add('hidden');
-                document.querySelector('.mobile-cards').classList.add('hidden');
+            // Hide all state indicators first
+            loadingEl.classList.add('hidden');
+            infiniteLoaderEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            emptyEl.classList.add('hidden');
+
+            switch(state) {
+                case 'loading-initial':
+                    loadingEl.classList.remove('hidden');
+                    desktopTable.classList.add('hidden');
+                    mobileCards.classList.add('hidden');
+                    break;
+                case 'loading-more':
+                    infiniteLoaderEl.classList.remove('hidden');
+                    break;
+                case 'error':
+                    errorEl.classList.remove('hidden');
+                    document.getElementById('error-text').textContent = message;
+                    desktopTable.classList.add('hidden');
+                    mobileCards.classList.add('hidden');
+                    break;
+                case 'empty':
+                    emptyEl.classList.remove('hidden');
+                    desktopTable.classList.add('hidden');
+                    mobileCards.classList.add('hidden');
+                    break;
+                case 'table':
+                case 'cards':
+                    desktopTable.classList.remove('hidden');
+                    mobileCards.classList.remove('hidden');
+                    break;
             }
         }
+
 
         function formatCurrency(value) {
             if (value === null || value === undefined) return '—';
@@ -541,14 +621,15 @@
             document.getElementById('article-count-mobile').textContent = `${count} article${count > 1 ? 's' : ''}`;
         }
 
-        function updateLastUpdateTime() {
-            // Cette fonction met à jour l'heure de la dernière mise à jour
-        }
-
         function syncSortOptions() {
             const desktopSort = document.getElementById('sortOptions');
             const mobileSort = document.getElementById('sortOptionsMobile');
             
+            const handleSortChange = () => {
+                mobileSort.value = desktopSort.value;
+                filterAndSortArticles();
+            };
+
             desktopSort.addEventListener('change', () => {
                 mobileSort.value = desktopSort.value;
                 filterAndSortArticles();
@@ -560,15 +641,22 @@
             });
         }
 
-        document.getElementById('searchInput').addEventListener('input', filterAndSortArticles);
+        const debouncedSearch = debounce(() => loadArticles(true), 300);
+        document.getElementById('searchInput').addEventListener('input', debouncedSearch);
+
         document.getElementById('typeFilter').addEventListener('change', filterAndSortArticles);
         document.getElementById('demarFilter').addEventListener('change', filterAndSortArticles);
+
+        window.addEventListener('scroll', () => {
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500 && hasMore && !isLoading) {
+                loadArticles();
+            }
+        });
 
         window.addEventListener('DOMContentLoaded', () => {
             loadArticles();
             syncSortOptions();
         });
-        setInterval(loadArticles, 300000); // Refreshes every 5 minutes
     </script>
 </body>
 </html>

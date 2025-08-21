@@ -46,16 +46,32 @@ app.use((req, res, next) => {
 
 // Routes publiques
 app.get('/api/public/articles', async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 100;
+  const searchTerm = req.query.search;
+  const offset = (page - 1) * limit;
+
   try {
-    const [rows] = await pool.query('SELECT * FROM articles');
-    
+    let query = 'SELECT * FROM articles';
+    const queryParams = [];
+
+    if (searchTerm) {
+      query += ' WHERE code LIKE ? OR description LIKE ? OR demar LIKE ? OR type LIKE ?';
+      queryParams.push(`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`);
+    }
+
+    query += ' ORDER BY id ASC LIMIT ? OFFSET ?';
+    queryParams.push(limit, offset);
+
+    const [rows] = await pool.query(query, queryParams);
+
     // Convertir les prix en nombres
     const articles = rows.map(row => ({
       ...row,
       prix_vente: parseFloat(row.prix_vente),
       achat_minimum: parseFloat(row.achat_minimum)
     }));
-    
+
     res.json(articles);
   } catch (err) {
     console.error('Erreur récupération articles:', err);
@@ -63,36 +79,10 @@ app.get('/api/public/articles', async (req, res) => {
   }
 });
 
-// Recherche d'articles
-app.get('/api/public/articles/search', async (req, res) => {
-  const searchTerm = req.query.q;
-  if (!searchTerm) return res.status(400).json({ error: 'Terme manquant' });
-
-  try {
-    const [rows] = await pool.query(
-      `SELECT * FROM articles 
-       WHERE code LIKE ? OR description LIKE ? OR type LIKE ?`,
-      [`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`]
-    );
-    
-    // Convertir les prix en nombres
-    const articles = rows.map(row => ({
-      ...row,
-      prix_vente: parseFloat(row.prix_vente),
-      achat_minimum: parseFloat(row.achat_minimum)
-    }));
-    
-    res.json(articles);
-  } catch (err) {
-    console.error('Erreur recherche articles:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
 // Authentification
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
-  
+
   try {
     const [users] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
     if (users.length === 0) return res.status(401).json({ error: 'Identifiants invalides' });
@@ -154,13 +144,13 @@ app.get('/api/admin/articles', authenticate, isAdmin, async (req, res) => {
 
 app.post('/api/admin/articles', authenticate, isAdmin, async (req, res) => {
   const { code, description, demar, prix_vente, achat_minimum, unite, type } = req.body;
-  
+
   try {
     const [result] = await pool.execute(
       'INSERT INTO articles (code, description, demar, prix_vente, achat_minimum, unite, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [code, description, demar, prix_vente, achat_minimum, unite, type]
     );
-    
+
     res.status(201).json({ id: result.insertId });
   } catch (err) {
     console.error('Erreur création article:', err);
@@ -171,13 +161,13 @@ app.post('/api/admin/articles', authenticate, isAdmin, async (req, res) => {
 app.put('/api/admin/articles/:id', authenticate, isAdmin, async (req, res) => {
   const id = req.params.id;
   const { code, description, demar, prix_vente, achat_minimum, unite, type } = req.body;
-  
+
   try {
     await pool.execute(
       'UPDATE articles SET code=?, description=?, demar=?, prix_vente=?, achat_minimum=?, unite=?, type=? WHERE id=?',
       [code, description, demar, prix_vente, achat_minimum, unite, type, id]
     );
-    
+
     res.json({ message: 'Article mis à jour' });
   } catch (err) {
     console.error('Erreur mise à jour article:', err);
@@ -187,7 +177,7 @@ app.put('/api/admin/articles/:id', authenticate, isAdmin, async (req, res) => {
 
 app.delete('/api/admin/articles/:id', authenticate, isAdmin, async (req, res) => {
   const id = req.params.id;
-  
+
   try {
     await pool.execute('DELETE FROM articles WHERE id=?', [id]);
     res.json({ message: 'Article supprimé' });
