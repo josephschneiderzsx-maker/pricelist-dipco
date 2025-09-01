@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIPCO - Dashboard Admin</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <!-- ================= PAGE DE CONNEXION ================= -->
+    <div id="login-page" class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <img src="https://dipco.itxpress.net/dipco_logo.png" alt="DIPCO Logo" class="logo">
+                <h1 class="login-title">
+                    <i class="fas fa-shield-alt text-blue-500 mr-2"></i>
+                    Connexion
+                </h1>
+                <p class="login-subtitle">Accédez au tableau de bord </p>
+            </div>
+
+            <form id="login-form">
+                <div class="form-group">
+                    <input type="text" class="form-input" id="username" required placeholder="Votre nom d'utilisateur">
+                </div>
+                <div class="form-group">
+                    <input type="password" class="form-input" id="password" required placeholder="Votre mot de passe">
+                </div>
+                <button type="submit" class="btn btn-primary w-full">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Se connecter
+                </button>
+            </form>
+            <div id="error-message" class="mt-4 p-3 bg-red-100 text-red-700 rounded-lg hidden"></div>
+        </div>
+    </div>
+
+    <!-- ================= PAGE DASHBOARD ================= -->
+    <div id="dashboard-page" class="dashboard-container">
+        <!-- En-tête Principal -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <img src="https://dipco.itxpress.net/dipco_logo.png" alt="DIPCO Logo" class="logo">
+                <div class="topbar-title">
+                    <h1>DIPCO Dashboard Admin</h1>
+                    <div class="topbar-subtitle" id="subtitle">Gestion des Articles & Prix</div>
+                </div>
+            </div>
+            <div class="user-zone">
+                <button class="theme-toggle" onclick="toggleTheme()" title="Basculer le thème">
+                    <i class="fas fa-moon" id="theme-icon"></i>
+                </button>
+                <span class="welcome-text" id="welcome-message">Bonjour, <strong id="username-display">Administrateur</strong></span>
+                <button class="btn-logout" onclick="logout()">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Déconnexion
+                </button>
+            </div>
+        </header>
+
+        <!-- Navigation par Onglets -->
+        <nav class="tabs">
+            <div class="tab active" onclick="switchTab('articles')">
+                <i class="fas fa-box mr-2"></i>Articles
+            </div>
+            <div class="tab" onclick="switchTab('batch')">
+                <i class="fas fa-layer-group mr-2"></i>Ajout en Lot
+            </div>
+            <div class="tab" onclick="switchTab('users')" id="users-tab" style="display:none;">
+                <i class="fas fa-users mr-2"></i>Utilisateurs
+            </div>
+        </nav>
+
+        <!-- Contenu Principal -->
+        <main class="main-content">
+            <!-- Onglet Articles -->
+            <div id="articles-view" class="view active">
+                <!-- Bouton de basculement des statistiques -->
+                <button class="stats-toggle" onclick="toggleStats()" id="stats-toggle-btn">
+                    <i class="fas fa-eye" id="stats-eye-icon"></i>
+                    <span id="stats-toggle-text">Masquer les statistiques</span>
+                </button>
+
+                <!-- Cartes de Statistiques -->
+                <div class="stats-grid" id="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-articles">0</div>
+                        <div class="stat-label">Articles</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avg-price">$0.00</div>
+                        <div class="stat-label">Prix moyen ($)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-value">$0.00</div>
+                        <div class="stat-label">Total valeur ($)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avg-value">$0.00</div>
+                        <div class="stat-label">Valeur moyenne ($)</div>
+                    </div>
+                </div>
+
+                <!-- Barre de Contrôles -->
+                <div class="controls-bar">
+                    <div class="controls-left">
+                        <input type="text" class="search-input" placeholder="Recherche par code, description, type..." id="search-articles">
+                        <select class="filter-select" id="filter-type">
+                            <option value="">Filtrer par Type</option>
+                        </select>
+                        <select class="filter-select" id="filter-demar">
+                            <option value="">Filtrer par Demar.</option>
+                        </select>
+                    </div>
+                    <div class="controls-right">
+                        <button class="btn btn-success" onclick="openAdd()">
+                            <i class="fas fa-plus mr-1"></i>Ajouter
+                        </button>
+                        <button class="btn btn-excel" onclick="exportArticles()">
+                            <!-- Icône Excel stylisée -->
+                            <svg class="icon-excel" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                <path d="M12,11L14,15H12.5L11,12.5L9.5,15H8L10,11L8,7H9.5L11,9.5L12.5,7H14L12,11Z"/>
+                            </svg>
+                            Export Excel
+                        </button>
+                        <button class="btn btn-secondary" onclick="refreshArticles()">
+                            <i class="fas fa-sync-alt mr-1"></i>Rafraîchir
+                        </button>
+                        <button class="btn btn-secondary" onclick="toggleValueColumn()" id="toggle-value-btn" title="Afficher/Masquer la colonne Valeur">
+                            <i class="fas fa-eye mr-1"></i>Valeur
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tableau des Articles -->
+                <div class="table-container">
+                    <table class="table" id="articlesTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">Actions</th>
+                                <th onclick="sortTable('code')">Code</th>
+                                <th onclick="sortTable('description')">Description</th>
+                                <th onclick="sortTable('demar')">Demar.</th>
+                                <th onclick="sortTable('price')">Prix ($)</th>
+                                <th onclick="sortTable('achat')">Achat Minimum</th>
+                                <th onclick="sortTable('value')" class="value-column">Valeur ($)</th>
+                                <th onclick="sortTable('unit')">Unité</th>
+                                <th onclick="sortTable('type')">Type</th>
+                            </tr>
+                        </thead>
+                        <tbody id="articles-tbody">
+                            <!-- Les articles seront chargés ici -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Conteneur de cartes pour mobile -->
+                <div class="cards-container" id="articles-cards">
+                    <!-- Les cartes d'articles seront générées ici -->
+                </div>
+            </div>
+
+            <!-- Page d'Ajout en Lot -->
+            <div id="batch-view" class="view">
+                <div class="batch-page">
+                    <div class="batch-header">
+                        <h2 class="batch-title">
+                            <i class="fas fa-layer-group mr-2"></i>Ajout d'Articles en Lot
+                        </h2>
+                        <div class="batch-controls">
+                            <button type="button" class="btn btn-success" id="batch-add-row">
+                                <i class="fas fa-plus mr-1"></i>Ajouter une ligne
+                            </button>
+                            <button type="button" class="btn btn-primary" id="batch-save-all">
+                                <i class="fas fa-save mr-1"></i>Sauvegarder tout
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearBatchTable()">
+                                <i class="fas fa-trash-alt mr-1"></i>Vider le tableau
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="batch-table-container">
+                        <table class="batch-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Description</th>
+                                    <th>Demar.</th>
+                                    <th>Prix ($)</th>
+                                    <th>Achat Min</th>
+                                    <th>Unité</th>
+                                    <th>Type</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batch-items-table">
+                                <!-- Les lignes d'ajout en lot seront générées ici -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Datalists pour l'autocomplétion -->
+                    <datalist id="unit-list">
+                        <option value="Unité">
+                        <option value="Kg">
+                        <option value="L">
+                        <option value="m">
+                        <option value="m²">
+                        <option value="Pièce">
+                    </datalist>
+                    <datalist id="type-list">
+                        <option value="electronique">
+                        <option value="vetement">
+                        <option value="alimentaire">
+                        <option value="maison">
+                        <option value="bureau">
+                        <option value="sport">
+                    </datalist>
+                </div>
+            </div>
+
+            <!-- Page de Gestion des Utilisateurs -->
+            <div id="users-view" class="view">
+                <div class="controls-bar">
+                    <div class="controls-left">
+                        <input type="text" class="search-input" placeholder="Recherche par nom, username..." id="search-users">
+                    </div>
+                    <div class="controls-right">
+                        <button class="btn btn-success" onclick="openAddUser()">
+                            <i class="fas fa-plus mr-1"></i>Ajouter
+                        </button>
+                        <button class="btn btn-secondary" onclick="refreshUsers()">
+                            <i class="fas fa-sync-alt mr-1"></i>Rafraîchir
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="table" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">Actions</th>
+                                <th onclick="sortUsersTable('name')">Nom</th>
+                                <th onclick="sortUsersTable('username')">Username</th>
+                                <th onclick="sortUsersTable('role')">Rôle</th>
+                                <th onclick="sortUsersTable('created_at')">Créé le</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody">
+                            <!-- Les utilisateurs seront chargés ici -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Ajouter/Modifier Article -->
+    <div id="addArticleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Ajouter un Article</h2>
+                <button class="modal-close" onclick="closeModal('addArticleModal')">&times;</button>
+            </div>
+            <form id="addArticleForm">
+                <input type="hidden" id="articleId">
+                <div class="form-group">
+                    <label class="form-label">Code</label>
+                    <input type="text" class="form-input" id="article-code" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" class="form-input" id="article-description" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Prix ($)</label>
+                    <input type="number" step="0.01" class="form-input" id="article-price" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Achat minimum</label>
+                    <input type="number" step="1" class="form-input" id="article-achat" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valeur calculée</label>
+                    <input type="text" class="form-input" id="article-value" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unité</label>
+                    <input type="text" class="form-input" id="article-unit" list="unit-suggestions" placeholder="Ex: Unité, Kg, L, m...">
+                    <datalist id="unit-suggestions"></datalist>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <input type="text" class="form-input" id="article-type" list="type-suggestions" placeholder="Ex: electronique, vetement...">
+                    <datalist id="type-suggestions"></datalist>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Demar.</label>
+                    <input type="text" class="form-input" id="article-demar" list="demar-suggestions" placeholder="Ex: 0000">
+                    <datalist id="demar-suggestions"></datalist>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addArticleModal')">Annuler</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save mr-2"></i>Sauvegarder
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Ajouter/Modifier Utilisateur -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="userModalTitle">Ajouter un Utilisateur</h2>
+                <button class="modal-close" onclick="closeModal('userModal')">&times;</button>
+            </div>
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                <div class="form-group">
+                    <label class="form-label">Nom</label>
+                    <input type="text" class="form-input" id="user-name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-input" id="user-username" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mot de passe</label>
+                    <input type="password" class="form-input" id="user-password" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirmer le mot de passe</label>
+                    <input type="password" class="form-input" id="user-password-confirm" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Rôle</label>
+                    <select class="form-input" id="user-role" required>
+                        <option value="user">Utilisateur</option>
+                        <option value="admin">Administrateur</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Annuler</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save mr-2"></i>Sauvegarder
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/ui.js"></script>
+    <script src="assets/js/articles.js"></script>
+    <script src="assets/js/users.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

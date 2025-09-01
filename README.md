@@ -1,30 +1,76 @@
 # Projet Dashboard Admin - Dipco
 
-Ce projet est une application web complète avec un frontend pour l'administration et un backend pour la gestion des données.
+Ce projet est une application web complète avec un frontend pour l'administration et un backend pour la gestion des données. Cette version a été restructurée pour une meilleure maintenabilité et sécurité.
 
 ## Aperçu
 
-L'application permet aux administrateurs de se connecter à un tableau de bord sécurisé pour gérer des articles (produits).
+L'application permet aux administrateur de se connecter à un tableau de bord sécurisé pour gérer des articles (produits) et des utilisateurs. Il y a aussi une page publique pour visualiser le catalogue d'articles.
 
-- **Frontend**: Construit avec HTML, CSS, et JavaScript vanilla. Il inclut une page de connexion et un tableau de bord pour le CRUD (Créer, Lire, Mettre à jour, Supprimer) des articles.
-- **Backend**: Une API RESTful construite avec Node.js et Express.js. Elle gère l'authentification avec JWT et interagit avec une base de données MySQL.
+- **Frontend Public**: Une page statique qui affiche le catalogue des articles avec des filtres et une recherche.
+- **Frontend Admin**: Une application à page unique (SPA) pour l'administration. Elle inclut une page de connexion et un tableau de bord pour le CRUD des articles et des utilisateurs.
+- **Backend**: Une API RESTful construite avec Node.js et Express.js. Elle gère l'authentification avec JWT (via des cookies httpOnly) et interagit avec une base de données MySQL.
+
+## Structure du Projet
+
+Le projet est maintenant organisé de la manière suivante pour une meilleure séparation des préoccupations :
+
+```
+/
+├── admin/
+│   ├── assets/
+│   │   ├── css/
+│   │   │   └── style.css
+│   │   └── js/
+│   │       ├── api.js
+│   │       ├── articles.js
+│   │       ├── auth.js
+│   │       ├── main.js
+│   │       ├── ui.js
+│   │       └── users.js
+│   └── index.html
+├── backend/
+│   ├── src/
+│   │   ├── config/
+│   │   │   └── database.js
+│   │   ├── controllers/
+│   │   │   ├── articleController.js
+│   │   │   ├── authController.js
+│   │   │   └── userController.js
+│   │   ├── middleware/
+│   │   │   ├── auth.js
+│   │   │   └── validators.js
+│   │   └── routes/
+│   │       ├── articles.js
+│   │       ├── auth.js
+│   │       └── users.js
+│   ├── app.js
+│   ├── package.json
+│   └── ...
+├── public/
+│   ├── assets/
+│   │   ├── css/
+│   │   │   └── style.css
+│   │   └── js/
+│   │       └── app.js
+│   └── index.html
+└── ...
+```
 
 ## Technologies utilisées
 
 - **Frontend**:
-  - HTML5
-  - CSS3 (avec une approche de style moderne)
-  - JavaScript (ES6+)
-  - [Tailwind CSS](https://tailwindcss.com/) (utilisé via CDN pour la page de connexion)
-  - [Font Awesome](https://fontawesome.com/) (pour les icônes)
+  - HTML5, CSS3, JavaScript (ES6+)
+  - Font Awesome (pour les icônes)
+  - Tailwind CSS (utilisé via CDN pour la page publique)
 
 - **Backend**:
-  - [Node.js](https://nodejs.org/)
-  - [Express.js](https://expressjs.com/)
-  - [MySQL2](https://github.com/sidorares/node-mysql2) (pour la connexion à la base de données MySQL)
-  - [JSON Web Tokens (JWT)](https://jwt.io/) (pour l'authentification)
-  - [bcrypt](https://github.com/kelektiv/node.bcrypt.js) (pour le hachage des mots de passe)
-  - [dotenv](https://github.com/motdotla/dotenv) (pour la gestion des variables d'environnement)
+  - Node.js, Express.js
+  - MySQL2 (pour la connexion à la base de données MySQL)
+  - JSON Web Tokens (JWT) pour l'authentification
+  - bcrypt pour le hachage des mots de passe
+  - dotenv pour la gestion des variables d'environnement
+  - express-validator pour la validation des entrées
+  - cors, cookie-parser, express-rate-limit
 
 ## Installation et Lancement
 
@@ -33,20 +79,24 @@ L'application permet aux administrateurs de se connecter à un tableau de bord s
 - Node.js et npm installés
 - Une base de données MySQL fonctionnelle
 
-### 1. Configuration du Backend
+### 1. Configuration de la base de données
 
-1.  **Clonez le dépôt** (ou téléchargez les fichiers) et naviguez dans le dossier `backend`:
+1.  Importez le fichier `pricelist.sql` dans votre base de données MySQL.
+2.  Assurez-vous que votre base de données contient les tables `articles` et `users`.
+
+### 2. Configuration du Backend
+
+1.  Naviguez dans le dossier `backend`:
     ```sh
     cd backend
     ```
 
-2.  **Installez les dépendances** npm:
+2.  Installez les dépendances npm:
     ```sh
     npm install
     ```
 
-3.  **Configurez les variables d'environnement**:
-    Créez un fichier `.env` à la racine du dossier `backend` en vous basant sur le fichier `.env.example` (s'il existe) ou en utilisant les variables ci-dessous.
+3.  Créez un fichier `.env` à la racine du dossier `backend` et remplissez-le avec les variables suivantes :
 
     ```env
     # Configuration du serveur
@@ -63,17 +113,17 @@ L'application permet aux administrateurs de se connecter à un tableau de bord s
     JWT_EXPIRES_IN=1h
     ```
 
-4.  **Démarrez le serveur backend**:
+4.  Démarrez le serveur backend:
     ```sh
     node app.js
     ```
     Le serveur devrait maintenant tourner sur `http://localhost:3000`.
 
-### 2. Lancement du Frontend
+### 3. Lancement de l'Application
 
-Le frontend est composé de fichiers statiques (HTML, CSS, JS). Il doit être servi par un serveur web. Pour un développement local simple, vous pouvez utiliser une extension comme "Live Server" dans VS Code.
+Le backend sert maintenant les parties frontend de l'application.
 
-1.  Ouvrez le fichier `admin/login.html` dans votre navigateur.
-2.  L'application communiquera avec le backend qui tourne sur le port 3000. Assurez-vous que le backend est en cours d'exécution.
+-   **Page publique**: Ouvrez votre navigateur et allez à `http://localhost:3000`.
+-   **Page d'administration**: Ouvrez votre navigateur et allez à `http://localhost:3000/admin`.
 
-*Note: Les appels API dans le frontend sont relatifs (ex: `/api/auth/login`), ce qui signifie que le frontend doit être servi depuis la même origine que le backend ou utiliser un proxy pour éviter les problèmes de CORS. La configuration actuelle de CORS dans `app.js` est stricte et n'autorise que `https://dipco.itxpress.net`.* Pour le développement local, vous devrez peut-être ajuster les paramètres CORS dans `backend/app.js`.
+Le serveur Express est configuré pour servir les fichiers statiques des dossiers `public` et `admin`.
