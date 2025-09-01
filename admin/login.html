@@ -771,6 +771,14 @@
             letter-spacing: -0.01em;
         }
 
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -1006,6 +1014,7 @@
 
         .toast button:hover {
             color: var(--text-primary);
+            background: none;
         }
 
         @keyframes slideIn {
@@ -1081,6 +1090,7 @@
             .tabs {
                 padding: 0 16px;
                 gap: 24px;
+                overflow-x: auto;
             }
 
             .controls-bar {
@@ -1222,15 +1232,9 @@
 
             <form id="login-form">
                 <div class="form-group">
-                    <label class="form-label">
-                    <!--  <i class="fas fa-user mr-2"></i>Nom d'utilisateur -->
-                    </label>
                     <input type="text" class="form-input" id="username" required placeholder="Votre nom d'utilisateur">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">
-                     <!--   <i class="fas fa-key mr-2"></i>Mot de passe -->
-                    </label>
                     <input type="password" class="form-input" id="password" required placeholder="Votre mot de passe">
                 </div>
                 <button type="submit" class="btn btn-primary w-full">
@@ -1256,7 +1260,7 @@
                 <button class="theme-toggle" onclick="toggleTheme()" title="Basculer le thème">
                     <i class="fas fa-moon" id="theme-icon"></i>
                 </button>
-                <span class="welcome-text">Bonjour, <strong id="username-display">Administrateur</strong></span>
+                <span class="welcome-text" id="welcome-message">Bonjour, <strong id="username-display">Administrateur</strong></span>
                 <button class="btn-logout" onclick="logout()">
                     <i class="fas fa-sign-out-alt mr-2"></i>Déconnexion
                 </button>
@@ -1270,6 +1274,9 @@
             </div>
             <div class="tab" onclick="switchTab('batch')">
                 <i class="fas fa-layer-group mr-2"></i>Ajout en Lot
+            </div>
+            <div class="tab" onclick="switchTab('users')" id="users-tab" style="display:none;">
+                <i class="fas fa-users mr-2"></i>Utilisateurs
             </div>
         </nav>
 
@@ -1422,6 +1429,40 @@
                     </datalist>
                 </div>
             </div>
+
+            <!-- Page de Gestion des Utilisateurs -->
+            <div id="users-view" class="view">
+                <div class="controls-bar">
+                    <div class="controls-left">
+                        <input type="text" class="search-input" placeholder="Recherche par nom, username..." id="search-users">
+                    </div>
+                    <div class="controls-right">
+                        <button class="btn btn-success" onclick="openAddUser()">
+                            <i class="fas fa-plus mr-1"></i>Ajouter
+                        </button>
+                        <button class="btn btn-secondary" onclick="refreshUsers()">
+                            <i class="fas fa-sync-alt mr-1"></i>Rafraîchir
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="table" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">Actions</th>
+                                <th onclick="sortUsersTable('name')">Nom</th>
+                                <th onclick="sortUsersTable('username')">Username</th>
+                                <th onclick="sortUsersTable('role')">Rôle</th>
+                                <th onclick="sortUsersTable('created_at')">Créé le</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody">
+                            <!-- Les utilisateurs seront chargés ici -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -1430,6 +1471,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title" id="modalTitle">Ajouter un Article</h2>
+                <button class="modal-close" onclick="closeModal('addArticleModal')">&times;</button>
             </div>
             <form id="addArticleForm">
                 <input type="hidden" id="articleId">
@@ -1478,51 +1520,109 @@
         </div>
     </div>
 
-    <script>
-        /*
-          ================= DIPCO DASHBOARD ADMIN UNIFIÉ =================
-          - Authentification intégrée
-          - CRUD articles avec API /api/admin/articles
-          - Ajout en lot via page dédiée
-          - Export Excel, filtres, tri, notifications
-          - Mode sombre/clair
-          - Responsive design
-          - Version mobile avec cartes
-        */
+    <!-- Modal Ajouter/Modifier Utilisateur -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="userModalTitle">Ajouter un Utilisateur</h2>
+                <button class="modal-close" onclick="closeModal('userModal')">&times;</button>
+            </div>
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                <div class="form-group">
+                    <label class="form-label">Nom</label>
+                    <input type="text" class="form-input" id="user-name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-input" id="user-username" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mot de passe</label>
+                    <input type="password" class="form-input" id="user-password" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirmer le mot de passe</label>
+                    <input type="password" class="form-input" id="user-password-confirm" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Rôle</label>
+                    <select class="form-input" id="user-role" required>
+                        <option value="user">Utilisateur</option>
+                        <option value="admin">Administrateur</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Annuler</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save mr-2"></i>Sauvegarder
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        /* ================= CONFIGURATION ================= */
+    <script>
+        // ================= CONFIGURATION =================
         const API_BASE = '/api/admin/articles';
+        const USERS_API = '/api/admin/users';
         const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
         let autoRefreshTimer = null;
 
-        /* ================= STATE ================= */
-        let articles = [];          // Liste complète depuis serveur
-        let filtered = [];          // Après recherche/filtres/tri
-        let sortState = { key: null, dir: 1 }; // dir: 1 asc, -1 desc
-        let allUnits = [];          // Unités existantes
-        let allTypes = [];          // Types existants
-        let allDemars = [];         // Demar.s existantes
+        // ================= STATE =================
+        let articles = [];
+        let users = [];
+        let filtered = [];
+        let sortState = { key: null, dir: 1 };
+        let allUnits = [];
+        let allTypes = [];
+        let allDemars = [];
         let currentTab = 'articles';
         let isLoading = false;
         let statsVisible = true;
+        let currentUser = null;
 
-        /* ================= AUTHENTIFICATION ================= */
-        
-        // Vérification de l'authentification au chargement
+        // ================= AUTHENTIFICATION =================
         function checkAuth() {
             const token = localStorage.getItem('token');
             const userInfo = localStorage.getItem('user');
             
             if (token && userInfo) {
                 try {
-                    const user = JSON.parse(userInfo);
-                    document.getElementById('username-display').textContent = user.name || user.username || 'Administrateur';
+                    currentUser = JSON.parse(userInfo);
+                    updateWelcomeMessage();
                     showDashboard();
+                    checkUserPermissions();
                 } catch (e) {
                     showLogin();
                 }
             } else {
                 showLogin();
+            }
+        }
+
+        // Mise à jour du message de bienvenue selon l'heure
+        function updateWelcomeMessage() {
+            const hour = new Date().getHours();
+            let greeting;
+            
+            if (hour >= 5 && hour < 12) {
+                greeting = 'Bonjour';
+            } else if (hour >= 12 && hour < 18) {
+                greeting = 'Bon après-midi';
+            } else {
+                greeting = 'Bonsoir';
+            }
+            
+            document.getElementById('welcome-message').innerHTML = `${greeting}, <strong>${currentUser.name || currentUser.username || 'Administrateur'}</strong>`;
+        }
+
+        // Afficher l'onglet utilisateurs seulement pour les administrateurs
+        function checkUserPermissions() {
+            if (currentUser && currentUser.role === 'admin') {
+                document.getElementById('users-tab').style.display = 'block';
+            } else {
+                document.getElementById('users-tab').style.display = 'none';
             }
         }
 
@@ -1539,49 +1639,7 @@
             loadArticles();
         }
 
-        // Gestion du formulaire de connexion
-        document.addEventListener('DOMContentLoaded', function() {
-            checkAuth();
-            setupEventListeners();
-            
-            document.getElementById('login-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-
-                const username = document.getElementById('username').value.trim();
-                const password = document.getElementById('password').value.trim();
-                const errorDiv = document.getElementById('error-message');
-                
-                errorDiv.classList.add('hidden');
-
-                try {
-                    const res = await fetch('/api/auth/login', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ username, password })
-                    });
-
-                    if (!res.ok) throw new Error('Identifiants incorrects');
-
-                    const data = await res.json();
-
-                    // Stocker le token et les infos utilisateur
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('user', JSON.stringify(data.user));
-
-                    // Afficher le dashboard
-                    showDashboard();
-                    toast('Connexion réussie !');
-                } catch (error) {
-                    errorDiv.textContent = error.message;
-                    errorDiv.classList.remove('hidden');
-                }
-            });
-        });
-
-        /* ================= GESTION DU THÈME ================= */
-        
+        // ================= GESTION DU THÈME =================
         function toggleTheme() {
             const currentTheme = document.documentElement.getAttribute('data-theme');
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
@@ -1604,8 +1662,7 @@
             }
         }
 
-        /* ================= GESTION DES STATISTIQUES ================= */
-        
+        // ================= GESTION DES STATISTIQUES =================
         function toggleStats() {
             const statsGrid = document.getElementById('stats-grid');
             const toggleBtn = document.getElementById('stats-toggle-btn');
@@ -1627,7 +1684,7 @@
             localStorage.setItem('statsVisible', statsVisible);
         }
 
-        /* ================= UTILS ================= */
+        // ================= UTILS =================
         function authHeaders() {
             return { 
                 'Content-Type': 'application/json', 
@@ -1696,13 +1753,13 @@
         function escapeHtml(s){
             if(s === null || s === undefined) return '';
             return String(s)
-                .replaceAll('&','&')
-                .replaceAll('<','<')
-                .replaceAll('>','>')
+                .replaceAll('&','&amp;')
+                .replaceAll('<','&lt;')
+                .replaceAll('>','&gt;')
                 .replaceAll('"','&quot;');
         }
 
-        /* ================= RENDERING ================= */
+        // ================= RENDERING =================
         function renderTable(list = filtered) {
             const tbody = document.getElementById('articles-tbody');
             tbody.innerHTML = '';
@@ -1827,29 +1884,44 @@
             });
         }
 
-        /* ================= NAVIGATION ENTRE ONGLETS ================= */
+        // ================= NAVIGATION ENTRE ONGLETS =================
         function switchTab(tab) {
             // Mise à jour des onglets visuels
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.tab:nth-child(${tab === 'articles' ? '1' : '2'})`).classList.add('active');
+            document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
 
             // Mise à jour des vues
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.getElementById(`${tab}-view`).classList.add('active');
 
             // Mise à jour du sous-titre
-            const subtitle = tab === 'articles' ? 'Gestion des Articles & Prix' : 'Ajout d\'Articles en Lot';
+            let subtitle;
+            switch(tab) {
+                case 'articles':
+                    subtitle = 'Gestion des Articles & Prix';
+                    break;
+                case 'batch':
+                    subtitle = 'Ajout d\'Articles en Lot';
+                    break;
+                case 'users':
+                    subtitle = 'Gestion des Utilisateurs';
+                    break;
+                default:
+                    subtitle = 'Tableau de bord';
+            }
             document.getElementById('subtitle').textContent = subtitle;
 
             currentTab = tab;
             
-            // Initialiser la page d'ajout en lot si nécessaire
+            // Charger les données si nécessaire
             if (tab === 'batch') {
                 initBatchTable();
+            } else if (tab === 'users') {
+                loadUsers();
             }
         }
 
-        /* ================= CHARGEMENT DES DONNÉES ================= */
+        // ================= CHARGEMENT DES DONNÉES =================
         
         // Configuration des écouteurs d'événements
         function setupEventListeners() {
@@ -1879,6 +1951,10 @@
             // Formulaires
             const addArticleForm = document.getElementById('addArticleForm');
             if (addArticleForm) addArticleForm.addEventListener('submit', handleAddArticle);
+
+            // Formulaire utilisateur
+            const userForm = document.getElementById('userForm');
+            if (userForm) userForm.addEventListener('submit', handleUserFormSubmit);
 
             // Fermeture des modales en cliquant à l'extérieur
             document.querySelectorAll('.modal').forEach(modal => {
@@ -1976,6 +2052,143 @@
             } finally {
                 setLoading(false);
             }
+        }
+
+        // ================= GESTION DES UTILISATEURS =================
+        async function loadUsers() {
+            try {
+                const res = await fetch(USERS_API, { headers: authHeaders() });
+                if (!res.ok) throw new Error('Impossible de charger les utilisateurs');
+                users = await res.json();
+                renderUsersTable();
+            } catch (e) {
+                console.error(e);
+                toast('Erreur chargement utilisateurs: ' + e.message, 'err');
+            }
+        }
+
+        function renderUsersTable() {
+            const tbody = document.getElementById('users-tbody');
+            tbody.innerHTML = '';
+            
+            if (!users.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Aucun utilisateur</td></tr>';
+                return;
+            }
+            
+            users.forEach(user => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-icon btn-edit" onclick="openEditUser('${user.id}')" title="Modifier">
+                                <svg class="icon-edit" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                                </svg>
+                            </button>
+                            <button class="btn-icon btn-delete" onclick="deleteUser('${user.id}')" title="Supprimer">
+                                <svg class="icon-delete" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                    <td>${escapeHtml(user.name || '')}</td>
+                    <td>${escapeHtml(user.username || '')}</td>
+                    <td>${escapeHtml(user.role || '')}</td>
+                    <td>${user.created_at ? new Date(user.created_at).toLocaleDateString() : ''}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openAddUser() {
+            document.getElementById('userModalTitle').textContent = 'Ajouter un utilisateur';
+            document.getElementById('userId').value = '';
+            document.getElementById('user-name').value = '';
+            document.getElementById('user-username').value = '';
+            document.getElementById('user-password').value = '';
+            document.getElementById('user-password-confirm').value = '';
+            document.getElementById('user-role').value = 'user';
+            document.getElementById('userModal').classList.add('active');
+        }
+
+        async function openEditUser(id) {
+            try {
+                const res = await fetch(`${USERS_API}/${id}`, { headers: authHeaders() });
+                if (!res.ok) throw new Error('Utilisateur non trouvé');
+                const user = await res.json();
+
+                document.getElementById('userModalTitle').textContent = 'Modifier l\'utilisateur';
+                document.getElementById('userId').value = user.id;
+                document.getElementById('user-name').value = user.name || '';
+                document.getElementById('user-username').value = user.username || '';
+                document.getElementById('user-password').value = '';
+                document.getElementById('user-password-confirm').value = '';
+                document.getElementById('user-role').value = user.role || 'user';
+
+                document.getElementById('userModal').classList.add('active');
+            } catch (e) {
+                toast('Erreur: ' + e.message, 'err');
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Supprimer cet utilisateur ?')) return;
+            try {
+                const res = await fetch(`${USERS_API}/${id}`, { method: 'DELETE', headers: authHeaders() });
+                if (!res.ok) throw new Error('Erreur suppression');
+                toast('Utilisateur supprimé');
+                loadUsers();
+            } catch (e) {
+                toast('Erreur suppression: ' + e.message, 'err');
+            }
+        }
+
+        async function handleUserFormSubmit(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('userId').value;
+            const name = document.getElementById('user-name').value.trim();
+            const username = document.getElementById('user-username').value.trim();
+            const password = document.getElementById('user-password').value;
+            const passwordConfirm = document.getElementById('user-password-confirm').value;
+            const role = document.getElementById('user-role').value;
+
+            // Validation
+            if (password !== passwordConfirm) {
+                toast('Les mots de passe ne correspondent pas', 'err');
+                return;
+            }
+
+            const userData = { name, username, role };
+            if (password) {
+                userData.password = password;
+            }
+
+            try {
+                const method = id ? 'PUT' : 'POST';
+                const url = id ? `${USERS_API}/${id}` : USERS_API;
+                const res = await fetch(url, {
+                    method,
+                    headers: authHeaders(),
+                    body: JSON.stringify(userData)
+                });
+                if (!res.ok) throw new Error('Erreur sauvegarde');
+                toast('Utilisateur enregistré');
+                closeModal('userModal');
+                loadUsers();
+            } catch (e) {
+                toast('Erreur: ' + e.message, 'err');
+            }
+        }
+
+        function refreshUsers() {
+            loadUsers();
+        }
+
+        function sortUsersTable(column) {
+            // Implémentation du tri similaire à celle des articles
         }
 
         // Mise à jour des options de filtres
@@ -2596,6 +2809,7 @@
             if (confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
+                currentUser = null;
                 toast('Déconnexion en cours...');
                 setTimeout(() => {
                     showLogin();
@@ -2627,6 +2841,8 @@
             autoRefreshTimer = setInterval(() => {
                 if (currentTab === 'articles') {
                     loadArticles();
+                } else if (currentTab === 'users') {
+                    loadUsers();
                 }
             }, AUTO_REFRESH_MS);
         }
@@ -2638,57 +2854,58 @@
             }
         }
 
-        // Demarer l'auto-refresh
-        window.addEventListener('load', () => {
-            loadTheme();
+        // ================= INITIALISATION =================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Vérifier l'authentification
+            checkAuth();
+            
+            // Configurer les écouteurs d'événements
+            setupEventListeners();
+            
+            // Gestion du formulaire de connexion
+            document.getElementById('login-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value.trim();
+                const errorDiv = document.getElementById('error-message');
+                
+                errorDiv.classList.add('hidden');
+
+                try {
+                    const res = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    if (!res.ok) throw new Error('Identifiants incorrects');
+
+                    const data = await res.json();
+
+                    // Stocker le token et les infos utilisateur
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    currentUser = data.user;
+
+                    // Afficher le dashboard
+                    updateWelcomeMessage();
+                    showDashboard();
+                    checkUserPermissions();
+                    toast('Connexion réussie !');
+                } catch (error) {
+                    errorDiv.textContent = error.message;
+                    errorDiv.classList.remove('hidden');
+                }
+            });
+            
+            // Démarrer l'auto-refresh
             startAutoRefresh();
         });
+
         window.addEventListener('beforeunload', stopAutoRefresh);
-
-        /* ================= FONCTIONS HÉRITÉES (COMPATIBILITÉ) ================= */
-        
-        // Alias pour compatibilité avec le code existant
-        function openBulkAddModal() {
-            switchTab('batch');
-        }
-
-        function showBatchModal() {
-            switchTab('batch');
-        }
-
-        function closeBatchModal() {
-            switchTab('articles');
-        }
-
-        // Fonctions vides pour compatibilité (ex-gestion utilisateurs)
-        function loadUsers() {
-            // Fonction vide - gestion utilisateurs supprimée
-        }
-
-        function renderUsersTable() {
-            // Fonction vide - gestion utilisateurs supprimée
-        }
-
-        function openAddUserModal() {
-            toast('Fonctionnalité non disponible', 'warn');
-        }
-
-        function editUser(id) {
-            toast('Fonctionnalité non disponible', 'warn');
-        }
-
-        function deleteUser(id) {
-            toast('Fonctionnalité non disponible', 'warn');
-        }
-
-        function handleAddUser(e) {
-            e.preventDefault();
-            toast('Fonctionnalité non disponible', 'warn');
-        }
-
-        function sortUsersTable(column) {
-            // Fonction vide - gestion utilisateurs supprimée
-        }
     </script>
 </body>
 </html>

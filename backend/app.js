@@ -19,7 +19,6 @@ app.use(express.json());
 app.use(cookieParser());
 app.set('trust proxy', 1);
 
-
 // Rate limiter pour le login
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -103,7 +102,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       secure: true,
       sameSite: 'strict',
       maxAge: 15 * 60 * 1000 // 15 minutes
-    }).json({ token, user: { id: user.id, name: user.name, role: user.role } });
+    }).json({ token, user: { id: user.id, name: user.name, username: user.username, role: user.role } });
   } catch (err) {
     console.error('Erreur login:', err);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -112,7 +111,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
 // Middleware d'authentification
 const authenticate = (req, res, next) => {
-  const token = req.cookies.token;
+  const token = req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Non authentifié' });
 
   try {
@@ -187,7 +186,148 @@ app.delete('/api/admin/articles/:id', authenticate, isAdmin, async (req, res) =>
   }
 });
 
-// Gestion des utilisateurs (similaire mais avec username au lieu d'email)
+// ================= GESTION DES UTILISATEURS =================
+
+// GET - Récupérer tous les utilisateurs
+app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, name, username, role, created_at FROM users');
+    res.json(rows);
+  } catch (err) {
+    console.error('Erreur récupération utilisateurs:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET - Récupérer un utilisateur spécifique
+app.get('/api/admin/users/:id', authenticate, isAdmin, async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const [rows] = await pool.query('SELECT id, name, username, role, created_at FROM users WHERE id = ?', [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+    
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Erreur récupération utilisateur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST - Créer un nouvel utilisateur
+app.post('/api/admin/users', authenticate, isAdmin, async (req, res) => {
+  const { name, username, password, role } = req.body;
+
+  // Validation des données
+  if (!name || !username || !password) {
+    return res.status(400).json({ error: 'Nom, username et mot de passe sont requis' });
+  }
+
+  try {
+    // Vérifier si l'utilisateur existe déjà
+    const [existingUsers] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+    if (existingUsers.length > 0) {
+      return res.status(409).json({ error: 'Cet username est déjà utilisé' });
+    }
+
+    // Hacher le mot de passe
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Insérer le nouvel utilisateur
+    const [result] = await pool.execute(
+      'INSERT INTO users (name, username, password, role) VALUES (?, ?, ?, ?)',
+      [name, username, hashedPassword, role || 'user']
+    );
+
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Utilisateur créé avec succès' 
+    });
+  } catch (err) {
+    console.error('Erreur création utilisateur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// PUT - Mettre à jour un utilisateur
+app.put('/api/admin/users/:id', authenticate, isAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, username, password, role } = req.body;
+
+  try {
+    // Vérifier si l'utilisateur existe
+    const [users] = await pool.query('SELECT id FROM users WHERE id = ?', [id]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    // Vérifier si le nouvel username est déjà utilisé par un autre utilisateur
+    const [existingUsers] = await pool.query('SELECT id FROM users WHERE username = ? AND id != ?', [username, id]);
+    if (existingUsers.length > 0) {
+      return res.status(409).json({ error: 'Cet username est déjà utilisé' });
+    }
+
+    let query = 'UPDATE users SET name = ?, username = ?, role = ?';
+    let params = [name, username, role];
+
+    // Si un nouveau mot de passe est fourni, le hacher et l'ajouter à la requête
+    if (password) {
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      query += ', password = ?';
+      params.push(hashedPassword);
+    }
+
+    query += ' WHERE id = ?';
+    params.push(id);
+
+    await pool.execute(query, params);
+
+    res.json({ message: 'Utilisateur mis à jour avec succès' });
+  } catch (err) {
+    console.error('Erreur mise à jour utilisateur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// DELETE - Supprimer un utilisateur
+app.delete('/api/admin/users/:id', authenticate, isAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Vérifier si l'utilisateur existe
+    const [users] = await pool.query('SELECT id FROM users WHERE id = ?', [id]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    // Empêcher la suppression de son propre compte
+    if (parseInt(id) === req.user.id) {
+      return res.status(400).json({ error: 'Vous ne pouvez pas supprimer votre propre compte' });
+    }
+
+    await pool.execute('DELETE FROM users WHERE id = ?', [id]);
+
+    res.json({ message: 'Utilisateur supprimé avec succès' });
+  } catch (err) {
+    console.error('Erreur suppression utilisateur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Route pour vérifier l'authentification
+app.get('/api/auth/verify', authenticate, (req, res) => {
+  res.json({ authenticated: true, user: req.user });
+});
+
+// Route de déconnexion
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('token').json({ message: 'Déconnexion réussie' });
+});
 
 // Démarrer le serveur
 app.listen(PORT, () => {
