@@ -1,3 +1,45 @@
+function setupEventListeners() {
+    // Charger le thème sauvegardé
+    loadTheme();
+
+    // Charger l'état des statistiques
+    const savedStatsVisible = localStorage.getItem('statsVisible');
+    if (savedStatsVisible !== null) {
+        statsVisible = savedStatsVisible === 'true';
+        if (!statsVisible) {
+            document.getElementById('stats-grid').classList.add('hidden');
+            document.getElementById('stats-eye-icon').className = 'fas fa-eye-slash';
+            document.getElementById('stats-toggle-text').textContent = 'Afficher les statistiques';
+        }
+    }
+
+    // Recherche en temps réel
+    const searchInput = document.getElementById('search-articles');
+    const typeFilter = document.getElementById('filter-type');
+    const demarFilter = document.getElementById('filter-demar');
+
+    if (searchInput) searchInput.addEventListener('input', applyFiltersSortSearch);
+    if (typeFilter) typeFilter.addEventListener('change', applyFiltersSortSearch);
+    if (demarFilter) demarFilter.addEventListener('change', applyFiltersSortSearch);
+
+    // Formulaires
+    const addArticleForm = document.getElementById('addArticleForm');
+    if (addArticleForm) addArticleForm.addEventListener('submit', handleAddArticle);
+
+    // Formulaire utilisateur
+    const userForm = document.getElementById('userForm');
+    if (userForm) userForm.addEventListener('submit', handleUserFormSubmit);
+
+    // Fermeture des modales en cliquant à l'extérieur
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeModal(modal.id);
+            }
+        });
+    });
+}
+
 // ================= STATE =================
 let articles = [];
 let users = [];

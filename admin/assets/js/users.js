@@ -47,9 +47,7 @@ function openAddUser() {
 
 async function openEditUser(id) {
     try {
-        const res = await fetch(`${USERS_API}/${id}`, { headers: authHeaders() });
-        if (!res.ok) throw new Error('Utilisateur non trouvé');
-        const user = await res.json();
+        const user = await getUserById(id);
 
         document.getElementById('userModalTitle').textContent = 'Modifier l\'utilisateur';
         document.getElementById('userId').value = user.id;

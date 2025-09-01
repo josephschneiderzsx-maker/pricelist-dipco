@@ -1,3 +1,6 @@
+const API_BASE = '/api/admin/articles';
+const USERS_API = '/api/admin/users';
+
 // ================= CHARGEMENT DES DONNÉES =================
 async function loadArticles(){
     try {
@@ -96,6 +99,12 @@ async function saveUser(userData, id) {
     } catch (e) {
         toast('Erreur: ' + e.message, 'err');
     }
+}
+
+async function getUserById(id) {
+    const res = await fetch(`${USERS_API}/${id}`, { headers: authHeaders() });
+    if (!res.ok) throw new Error('Utilisateur non trouvé');
+    return await res.json();
 }
 
 async function deleteUser(id) {
